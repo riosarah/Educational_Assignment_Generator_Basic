@@ -1,0 +1,61 @@
+﻿//@GeneratedCode
+@startuml programming_trainer.Logic.Entities.App.Student
++class Student #whitesmoke {
+    - String _firstName
+    - String _lastName
+    - String _email
+    - String _studentNumber
+    - DateTime _registrationDate
+    - List<Assignment> _assignments
+    ---
+     + String getFirstName()
+     + setFirstName(String value)
+     + String getLastName()
+     + setLastName(String value)
+     + String getEmail()
+     + setEmail(String value)
+     + String getStudentNumber()
+     + setStudentNumber(String value)
+     + DateTime getRegistrationDate()
+     + setRegistrationDate(DateTime value)
+     + List<Assignment> getAssignments()
+     + setAssignments(List<Assignment> value)
+    ---
+    + String get_FirstName()
+    + Void set_FirstName(String value)
+    + String get_LastName()
+    + Void set_LastName(String value)
+    + String get_Email()
+    + Void set_Email(String value)
+    + String get_StudentNumber()
+    + Void set_StudentNumber(String value)
+    + DateTime get_RegistrationDate()
+    + Void set_RegistrationDate(DateTime value)
+    + List<Assignment> get_Assignments()
+    + Void set_Assignments(List`1 value)
+    + String ToString()
+}
++abstract class EntityObject #white {
+    - Int32 _id
+    ---
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+}
++abstract class DbObject #white {
+}
+interface IIdentifiable #lightgrey {
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+    + Void CopyProperties(IIdentifiable other)
+}
+EntityObject <|-- Student
+DbObject <|-- EntityObject
+IIdentifiable ()- EntityObject
+Student "*" o-- "0..1" Assignment
+@enduml

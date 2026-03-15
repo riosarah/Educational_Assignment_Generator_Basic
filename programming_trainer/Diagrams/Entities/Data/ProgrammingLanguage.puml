@@ -1,0 +1,51 @@
+﻿//@GeneratedCode
+@startuml programming_trainer.Logic.Entities.Data.ProgrammingLanguage
++class ProgrammingLanguage #whitesmoke {
+    - String _name
+    - String _fileExtension
+    - Boolean _isActive
+    - List<Assignment> _assignments
+    ---
+     + String getName()
+     + setName(String value)
+     + String getFileExtension()
+     + setFileExtension(String value)
+     + Boolean getIsActive()
+     + setIsActive(Boolean value)
+     + List<Assignment> getAssignments()
+     + setAssignments(List<Assignment> value)
+    ---
+    + String get_Name()
+    + Void set_Name(String value)
+    + String get_FileExtension()
+    + Void set_FileExtension(String value)
+    + Boolean get_IsActive()
+    + Void set_IsActive(Boolean value)
+    + List<Assignment> get_Assignments()
+    + Void set_Assignments(List`1 value)
+    + String ToString()
+}
++abstract class EntityObject #white {
+    - Int32 _id
+    ---
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+}
++abstract class DbObject #white {
+}
+interface IIdentifiable #lightgrey {
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+    + Void CopyProperties(IIdentifiable other)
+}
+EntityObject <|-- ProgrammingLanguage
+DbObject <|-- EntityObject
+IIdentifiable ()- EntityObject
+ProgrammingLanguage "*" o-- "0..1" Assignment
+@enduml

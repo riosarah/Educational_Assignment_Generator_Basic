@@ -1,0 +1,218 @@
+{
+  "name": "C# Code Bewerter",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-3.5-turbo",
+          "mode": "list",
+          "cachedResultName": "GPT-3.5-TURBO"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.userPrompt }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11bdcf32-1da1-4989-a68f-bd2b2d47be5d",
+      "name": "OpenAI - Aufgabe generieren",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        80
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "iMe6LlMtPdK2T4G0",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "evaluate-assignment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "44bef040-ac2c-432c-a036-fd06ea52d8e9",
+      "name": "Webhook - Evaluate Assignment",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        80
+      ],
+      "webhookId": "evaluate-assignment-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input-Validierung und Extraktion\nconst body = $input.first().json.body;\n\nif (\n  !body.submittedAnswer ||\n  !body.description ||\n  !body.categoryId\n) {\n  throw new Error(\n    'Fehlende Parameter: submittedAnswer, description und categoryId sind erforderlich'\n  );\n}\n\nconst {\n  submittedAnswer,\n  description,\n  categoryId\n} = body;\n\n// System-Prompt für KI\nconst systemPrompt = `\nDu bist eine erfahrene Lehrkraft für die gymnasiale Oberstufe.\nDeine Aufgabe ist es, Schülerantworten fachlich korrekt, fair und konstruktiv zu bewerten.\n\nWICHTIG:\n- Bewerte INHALTLICH und METHODISCH\n- Keine Programmierung\n- Kein Code\n- Keine Lösungen ergänzen\n- Keine neuen Aufgaben stellen\n\nANTWORTE NUR MIT EINEM VALIDEN JSON-OBJEKT, OHNE ZUSÄTZLICHEN TEXT!\n`.trim();\n\n// User-Prompt für KI\nconst userPrompt = `\nBewerte die folgende Schülerantwort zur gegebenen Aufgabenstellung.\n\n### Aufgabenstellung:\n${description}\n\n### Schülerantwort:\n${submittedAnswer}\n\nErstelle eine Bewertung im EXAKTEN JSON-Format\n(kein Text außerhalb des JSON!):\n\n{\n  \"score\": 0,\n  \"feedback\": \"Ausführliches, konstruktives Feedback im Markdown-Format\"\n}\n\nBEACHTE:\n- score: Ganzzahl zwischen 0 und 100\n- feedback: Markdown-formatiert\n- konstruktiv, motivierend, sachlich\n- keine Musterlösungen\n- keine zusätzlichen Inhalte\n`.trim();\n\nreturn [\n  {\n    json: {\n      categoryId,\n      systemPrompt,\n      userPrompt,\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "d838a4e0-d193-423c-b9ca-abab26f08ff1",
+      "name": "Request Validierung & Preparation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Rohtext IMMER als String holen (robust)\nlet aiResponseRaw =\n  $input.first().json?.message?.content ??\n  $input.first().json?.content ??\n  $input.first().json?.text ??\n  $input.first().json?.message?.text ??\n  '';\n\nif (typeof aiResponseRaw !== 'string') aiResponseRaw = String(aiResponseRaw ?? '');\nif (!aiResponseRaw.trim()) {\n  throw new Error(\n    'Leere oder ungültige AI Response:\\n' +\n    JSON.stringify($input.first().json, null, 2)\n  );\n}\n\n// 2) JSON aus Code-Fences extrahieren ODER aus { ... } Block\nfunction extractJsonCandidate(raw) {\n  // ```json ... ```\n  let m = raw.match(/```json\\s*([\\s\\S]*?)\\s*```/i);\n  if (m?.[1]) return m[1].trim();\n\n  // ``` ... ```\n  m = raw.match(/```\\s*([\\s\\S]*?)\\s*```/);\n  if (m?.[1]) return m[1].trim();\n\n  // Fallback: erstes { bis letztes }\n  const start = raw.indexOf('{');\n  const end = raw.lastIndexOf('}');\n  if (start !== -1 && end !== -1 && end > start) {\n    return raw.slice(start, end + 1).trim();\n  }\n\n  return raw.trim();\n}\n\nlet aiResponse = extractJsonCandidate(aiResponseRaw);\n\n// 3) Helper: Control-Chars innerhalb von JSON-Strings escapen (fix für \"Bad control character\")\nfunction escapeControlCharsInsideStrings(input) {\n  let out = '';\n  let inString = false;\n  let escaped = false;\n\n  for (let i = 0; i < input.length; i++) {\n    const ch = input[i];\n    const code = ch.charCodeAt(0);\n\n    if (!inString) {\n      if (ch === '\"') inString = true;\n      out += ch;\n      continue;\n    }\n\n    if (escaped) {\n      out += ch;\n      escaped = false;\n      continue;\n    }\n\n    if (ch === '\\\\') {\n      out += ch;\n      escaped = true;\n      continue;\n    }\n\n    if (ch === '\"') {\n      out += ch;\n      inString = false;\n      continue;\n    }\n\n    // 0x00-0x1F sind in JSON-Strings verboten -> escapen\n    if (code >= 0x00 && code <= 0x1F) {\n      switch (ch) {\n        case '\\n': out += '\\\\n'; break;\n        case '\\r': out += '\\\\r'; break;\n        case '\\t': out += '\\\\t'; break;\n        case '\\b': out += '\\\\b'; break;\n        case '\\f': out += '\\\\f'; break;\n        default:\n          out += '\\\\u' + code.toString(16).padStart(4, '0');\n      }\n      continue;\n    }\n\n    out += ch;\n  }\n\n  return out;\n}\n\n// 4) Parse mit Fallback\nlet evaluationData;\ntry {\n  evaluationData = JSON.parse(aiResponse);\n} catch (e1) {\n  try {\n    evaluationData = JSON.parse(escapeControlCharsInsideStrings(aiResponse));\n  } catch (e2) {\n    throw new Error(\n      `Fehler beim Parsen der AI Response: ${e2.message}\\n\\n` +\n      `--- Extracted Candidate ---\\n${aiResponse}\\n\\n` +\n      `--- Raw Response ---\\n${aiResponseRaw}`\n    );\n  }\n}\n\n// 5) Validierung\nif (evaluationData?.score === undefined) {\n  throw new Error('AI Response fehlt \"score\"\\n\\n' + JSON.stringify(evaluationData, null, 2));\n}\nif (typeof evaluationData.feedback !== 'string' || !evaluationData.feedback.trim()) {\n  throw new Error('AI Response fehlt \"feedback\" (string)\\n\\n' + JSON.stringify(evaluationData, null, 2));\n}\n\n// 6) Score normalisieren + validieren\nconst score = Number.parseInt(String(evaluationData.score), 10);\nif (!Number.isFinite(score) || score < 0 || score > 100) {\n  throw new Error(`Ungültiger Score: ${evaluationData.score}`);\n}\n\n// 7) Ergebnis\nreturn [{\n  json: {\n    success: true,\n    score,\n    feedback: evaluationData.feedback,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "658747b8-5a95-4c38-b094-49e7a5952396",
+      "name": "Response Parsing & Formatting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "9f02bb15-df95-49ba-8a2c-66205c5c750a",
+      "name": "Response - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "6d4acd56-c543-4f1f-b7f8-d5b4fed3f0da",
+      "name": "Response - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error Handling\nconst error = $input.item.json.error || $input.all()[0].json.error;\n\nreturn [{\n  json: {\n    success: false,\n    error: error?.message || 'Unbekannter Fehler bei der Code-Bewertung',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "e31e2375-28a6-4a26-9257-c950280ebe65",
+      "name": "Error Handler1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        288
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI - Aufgabe generieren": {
+      "main": [
+        [
+          {
+            "node": "Response Parsing & Formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Evaluate Assignment": {
+      "main": [
+        [
+          {
+            "node": "Request Validierung & Preparation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Parsing & Formatting": {
+      "main": [
+        [
+          {
+            "node": "Response - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler1": {
+      "main": [
+        [
+          {
+            "node": "Response - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Validierung & Preparation": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Aufgabe generieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4f24c1a9-277f-4b9e-b9a8-f21555a0548f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "92c9315242e78b4ff1b6d73d40cb26ee343c7a5564c1b7e43d894967ebb556a2"
+  },
+  "id": "c4JEemztUHh6K3ox",
+  "tags": [
+    {
+      "updatedAt": "2026-02-03T19:16:46.110Z",
+      "createdAt": "2026-02-03T19:16:46.110Z",
+      "id": "z0HWdzWQ04hU7JHz",
+      "name": "Programming Trainer"
+    }
+  ]
+}

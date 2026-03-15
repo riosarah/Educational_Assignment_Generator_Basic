@@ -1,0 +1,83 @@
+﻿//@GeneratedCode
+@startuml programming_trainer.Logic.Entities.App.Assignment
++class Assignment #whitesmoke {
+    - Int32 _studentId
+    - String _studentPrompt
+    - Int32 _categoryId
+    - String _title
+    - String _description
+    - String _status
+    - DateTime _createdDate
+    - Student _student
+    - Category _category
+    - List<StudentResponse> _studentResponses
+    ---
+     + Int32 getStudentId()
+     + setStudentId(Int32 value)
+     + String getStudentPrompt()
+     + setStudentPrompt(String value)
+     + Int32 getCategoryId()
+     + setCategoryId(Int32 value)
+     + String getTitle()
+     + setTitle(String value)
+     + String getDescription()
+     + setDescription(String value)
+     + String getStatus()
+     + setStatus(String value)
+     + DateTime getCreatedDate()
+     + setCreatedDate(DateTime value)
+     + Student getStudent()
+     + setStudent(Student value)
+     + Category getCategory()
+     + setCategory(Category value)
+     + List<StudentResponse> getStudentResponses()
+     + setStudentResponses(List<StudentResponse> value)
+    ---
+    + Int32 get_StudentId()
+    + Void set_StudentId(Int32 value)
+    + String get_StudentPrompt()
+    + Void set_StudentPrompt(String value)
+    + Int32 get_CategoryId()
+    + Void set_CategoryId(Int32 value)
+    + String get_Title()
+    + Void set_Title(String value)
+    + String get_Description()
+    + Void set_Description(String value)
+    + String get_Status()
+    + Void set_Status(String value)
+    + DateTime get_CreatedDate()
+    + Void set_CreatedDate(DateTime value)
+    + Student get_Student()
+    + Void set_Student(Student value)
+    + Category get_Category()
+    + Void set_Category(Category value)
+    + List<StudentResponse> get_StudentResponses()
+    + Void set_StudentResponses(List`1 value)
+    + String ToString()
+}
++abstract class EntityObject #white {
+    - Int32 _id
+    ---
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+}
++abstract class DbObject #white {
+}
+interface IIdentifiable #lightgrey {
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+    + Void CopyProperties(IIdentifiable other)
+}
+EntityObject <|-- Assignment
+DbObject <|-- EntityObject
+IIdentifiable ()- EntityObject
+Assignment --> "0..1" Student
+Assignment --> "0..1" Category
+Assignment "*" o-- "0..1" StudentResponse
+@enduml

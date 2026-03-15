@@ -1,0 +1,61 @@
+﻿//@GeneratedCode
+@startuml programming_trainer.Logic.Entities.App.StudentResponse
++class StudentResponse #whitesmoke {
+    - Int32 _assignmentId
+    - String _submittedAnswer
+    - Int32 _score
+    - String _feedback
+    - DateTime _submissionDate
+    - Assignment _assignment
+    ---
+     + Int32 getAssignmentId()
+     + setAssignmentId(Int32 value)
+     + String getSubmittedAnswer()
+     + setSubmittedAnswer(String value)
+     + Int32 getScore()
+     + setScore(Int32 value)
+     + String getFeedback()
+     + setFeedback(String value)
+     + DateTime getSubmissionDate()
+     + setSubmissionDate(DateTime value)
+     + Assignment getAssignment()
+     + setAssignment(Assignment value)
+    ---
+    + Int32 get_AssignmentId()
+    + Void set_AssignmentId(Int32 value)
+    + String get_SubmittedAnswer()
+    + Void set_SubmittedAnswer(String value)
+    + Int32 get_Score()
+    + Void set_Score(Int32 value)
+    + String get_Feedback()
+    + Void set_Feedback(String value)
+    + DateTime get_SubmissionDate()
+    + Void set_SubmissionDate(DateTime value)
+    + Assignment get_Assignment()
+    + Void set_Assignment(Assignment value)
+    + String ToString()
+}
++abstract class EntityObject #white {
+    - Int32 _id
+    ---
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+}
++abstract class DbObject #white {
+}
+interface IIdentifiable #lightgrey {
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+    + Void CopyProperties(IIdentifiable other)
+}
+EntityObject <|-- StudentResponse
+DbObject <|-- EntityObject
+IIdentifiable ()- EntityObject
+StudentResponse --> "0..1" Assignment
+@enduml

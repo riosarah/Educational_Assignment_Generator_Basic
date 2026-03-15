@@ -1,0 +1,27 @@
+﻿//@GeneratedCode
+@startuml programming_trainer.Logic.Entities.VersionEntityObject
++abstract class VersionEntityObject #white {
+}
++abstract class EntityObject #white {
+    - Int32 _id
+    ---
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+}
++abstract class DbObject #white {
+}
+interface IIdentifiable #lightgrey {
+     + Int32 getId()
+     + setId(Int32 value)
+    ---
+    + Int32 get_Id()
+    + Void set_Id(Int32 value)
+    + Void CopyProperties(IIdentifiable other)
+}
+EntityObject <|-- VersionEntityObject
+DbObject <|-- EntityObject
+IIdentifiable ()- EntityObject
+@enduml

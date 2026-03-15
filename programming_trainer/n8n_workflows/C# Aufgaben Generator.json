@@ -1,0 +1,218 @@
+{
+  "name": "C# Aufgaben Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-3.5-turbo",
+          "mode": "list",
+          "cachedResultName": "GPT-3.5-TURBO"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.userPrompt }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ba83278a-ee96-461a-a911-cbb1844e2742",
+      "name": "OpenAI - Aufgabe generieren",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [
+        768,
+        -48
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "iMe6LlMtPdK2T4G0",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-assignment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f458bbae-4dde-4809-83ab-d5d5cf386812",
+      "name": "Webhook - Generate Assignment",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -48
+      ],
+      "webhookId": "generate-assignment-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input-Validierung und Extraktion\nconst body = $input.first().json.body;\n\nif (\n  !body.studentPrompt ||\n  !body.categoryId ||\n  !body.topic ||\n  !body.difficulty ||\n  !body.language ||\n  !body.outputFormat\n) {\n  throw new Error(\n    'Fehlende Parameter: studentPrompt, categoryId, topic, difficulty, language und outputFormat sind erforderlich'\n  );\n}\n\nconst {\n  studentPrompt,\n  categoryId,\n  categoryName,\n  topic,\n  difficulty,\n  language,\n  outputFormat\n} = body;\n\n// System-Prompt für KI\nconst systemPrompt = `\nDu bist eine erfahrene Lehrkraft für die gymnasiale Oberstufe.\nDeine Aufgabe ist es, anspruchsvolle, didaktisch saubere und realistische Lernaufgaben zu erstellen.\n\nWICHTIG:\n- Erstelle NUR die AUFGABENSTELLUNG\n- KEINE Lösungen\n- KEINE Rechenwege\n- KEINE Hinweise zur Lösung\n- KEINE Musterlösungen oder Antworten\n\nANTWORTE NUR MIT EINEM VALIDEN JSON-OBJEKT, OHNE ZUSÄTZLICHEN TEXT!\n`.trim();\n\n// User-Prompt für KI\nconst userPrompt = `\nErstelle eine umfangreiche Lernaufgabe für die gymnasiale Oberstufe mit folgenden Parametern:\n\n- Themenbereich: ${categoryName || 'Allgemein'}\n- Thema: ${topic}\n- Schwierigkeit: ${difficulty}\n- Sprache: ${language}\n- Ausgabeformat: Markdown\n\nStudenten-Prompt:\n\"${studentPrompt}\"\n\nDie Aufgabe soll:\n- anspruchsvoll sein (Oberstufen-Niveau)\n- mehrere Teilaufgaben enthalten (z. B. a), b), c))\n- zum selbstständigen Denken anregen\n- KEINE Lösung, KEINE Tipps, KEINE Rechenschritte enthalten\n\nDie Antwort MUSS exakt dieses JSON-Format haben\n(kein Text außerhalb des JSON!):\n\n{\n  \"title\": \"Kurzer prägnanter Titel der Aufgabe\",\n  \"description\": \"AUSSCHLIESSLICH die Aufgabenstellung im Markdown-Format\"\n}\n\nSTRIKT VERBOTEN in der description:\n- Lösungen\n- Ergebnisse\n- Hinweise\n- Wörter wie: Lösung, Hinweis, Ergebnis, Antwort\n\nBEACHTE:\n- title: max. 100 Zeichen\n- description: nur Aufgabenstellung, gern mehrteilig\n- Sprache MUSS ${language} sein\n- KEIN zusätzlicher Text außerhalb des JSON\n`.trim();\n\nreturn [\n  {\n    json: {\n      studentPrompt,\n      categoryId,\n      categoryName,\n      topic,\n      difficulty,\n      language,\n      outputFormat,\n      systemPrompt,\n      userPrompt,\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "id": "fbd39b0b-eac6-4c55-a981-e26a7bb1354c",
+      "name": "Request Validierung & Preparation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Rohtext IMMER als String holen\nlet aiResponseRaw =\n  $input.first().json?.message?.content ??\n  $input.first().json?.content ??\n  $input.first().json?.text ??\n  '';\n\n// 2) Absicherung\nif (typeof aiResponseRaw !== 'string' || !aiResponseRaw.trim()) {\n  throw new Error(\n    'Leere oder ungültige AI Response:\\n' +\n    JSON.stringify($input.first().json, null, 2)\n  );\n}\n\n// 3) JSON extrahieren (erstes { bis letztes })\nconst start = aiResponseRaw.indexOf('{');\nconst end = aiResponseRaw.lastIndexOf('}');\nif (start === -1 || end === -1 || end <= start) {\n  throw new Error('Kein JSON in AI Response gefunden.\\n\\nAntwort:\\n' + aiResponseRaw);\n}\nlet jsonText = aiResponseRaw.slice(start, end + 1);\n\n// 4) Helper: Control-Chars innerhalb von String-Literalen escapen\nfunction escapeControlCharsInsideStrings(input) {\n  let out = '';\n  let inString = false;\n  let escaped = false;\n\n  for (let i = 0; i < input.length; i++) {\n    const ch = input[i];\n    const code = ch.charCodeAt(0);\n\n    if (!inString) {\n      // außerhalb von Strings ist \\n/\\t etc als Whitespace ok\n      if (ch === '\"') inString = true;\n      out += ch;\n      continue;\n    }\n\n    // inString === true\n    if (escaped) {\n      // aktuelles Zeichen ist escaped, einfach übernehmen\n      out += ch;\n      escaped = false;\n      continue;\n    }\n\n    if (ch === '\\\\') {\n      out += ch;\n      escaped = true;\n      continue;\n    }\n\n    if (ch === '\"') {\n      out += ch;\n      inString = false;\n      continue;\n    }\n\n    // JSON erlaubt KEINE echten Control Characters (0x00-0x1F) innerhalb von Strings\n    // => escapen wir sie\n    if (code >= 0x00 && code <= 0x1F) {\n      switch (ch) {\n        case '\\n': out += '\\\\n'; break;\n        case '\\r': out += '\\\\r'; break;\n        case '\\t': out += '\\\\t'; break;\n        case '\\b': out += '\\\\b'; break;\n        case '\\f': out += '\\\\f'; break;\n        default:\n          out += '\\\\u' + code.toString(16).padStart(4, '0');\n      }\n      continue;\n    }\n\n    out += ch;\n  }\n\n  return out;\n}\n\n// 5) JSON parsen mit Fallback-Sanitizing\nlet taskData;\ntry {\n  taskData = JSON.parse(jsonText);\n} catch (e1) {\n  try {\n    const sanitized = escapeControlCharsInsideStrings(jsonText);\n    taskData = JSON.parse(sanitized);\n  } catch (e2) {\n    throw new Error(\n      'JSON Parse Error: ' + e2.message +\n      '\\n\\n--- Extracted JSON ---\\n' + jsonText +\n      '\\n\\n--- Raw Response ---\\n' + aiResponseRaw\n    );\n  }\n}\n\n// 6) Validierung\nif (typeof taskData.title !== 'string' || typeof taskData.description !== 'string') {\n  throw new Error('JSON enthält kein gültiges title oder description\\n\\n' + JSON.stringify(taskData, null, 2));\n}\n\n// 7) Return\nreturn [{\n  json: {\n    success: true,\n    title: taskData.title.substring(0, 100),\n    description: taskData.description,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "036f2c57-5bc2-4b41-91ee-e0c9edeb6f9a",
+      "name": "Response Parsing & Formatting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "4936acaf-6eb8-47d3-9d97-15b6177fbf19",
+      "name": "Response - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "867d8591-64c7-4d4c-9de7-883c82fa1cbc",
+      "name": "Response - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error Handling\nconst error = $input.item.json.error || $input.all()[0].json.error;\n\nreturn [{\n  json: {\n    success: false,\n    error: error?.message || 'Unbekannter Fehler bei der Aufgabengenerierung',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "22b3be0a-b031-4c21-a098-1baa34ae0b81",
+      "name": "Error Handler1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI - Aufgabe generieren": {
+      "main": [
+        [
+          {
+            "node": "Response Parsing & Formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Generate Assignment": {
+      "main": [
+        [
+          {
+            "node": "Request Validierung & Preparation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Parsing & Formatting": {
+      "main": [
+        [
+          {
+            "node": "Response - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler1": {
+      "main": [
+        [
+          {
+            "node": "Response - Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Validierung & Preparation": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Aufgabe generieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "bcb65d44-37fe-4f61-94aa-2123889cd0dc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "92c9315242e78b4ff1b6d73d40cb26ee343c7a5564c1b7e43d894967ebb556a2"
+  },
+  "id": "IkfTaPy5jnnN79Vr",
+  "tags": [
+    {
+      "updatedAt": "2026-02-03T19:16:46.110Z",
+      "createdAt": "2026-02-03T19:16:46.110Z",
+      "id": "z0HWdzWQ04hU7JHz",
+      "name": "Programming Trainer"
+    }
+  ]
+}
