@@ -1,0 +1,188 @@
+<div class="portfolio-container">
+  <div class="portfolio-header">
+    <h2>Mein Portfolio</h2>
+    <p class="subtitle">Verwalte deine Lernaufgaben und Bewertungen</p>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Gesamt</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-success">{{ stats.completed }}</div>
+      <div class="stat-label">Abgeschlossen</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-warning">{{ stats.pending }}</div>
+      <div class="stat-label">Offen</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value text-primary">{{ stats.averageScore }}%</div>
+      <div class="stat-label">Durchschnitt</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-panel card">
+    <div class="filters-grid">
+      <div class="form-group">
+        <label class="form-label">Student</label>
+        <div *ngIf="isLoadingStudents" class="text-muted">Studenten werden geladen...</div>
+        <select *ngIf="!isLoadingStudents" class="form-control" [(ngModel)]="filterStudentId" (change)="applyFilters()">
+          <option [ngValue]="null">Alle Studenten</option>
+          <option *ngFor="let student of students" [ngValue]="student.id">
+            {{ student.firstName }} {{ student.lastName }}
+          </option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Suche</label>
+        <input 
+          type="text" 
+          class="form-control" 
+          [(ngModel)]="searchTerm"
+          (input)="applyFilters()"
+          placeholder="Titel oder Beschreibung...">
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select class="form-control" [(ngModel)]="filterStatus" (change)="applyFilters()">
+          <option value="all">Alle</option>
+          <option value="completed">Abgeschlossen</option>
+          <option value="open">Offen</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Thema</label>
+        <select class="form-control" [(ngModel)]="filterCategory" (change)="applyFilters()">
+          <option [value]="null">Alle</option>
+          <option *ngFor="let cat of categories" [value]="cat.id">
+            {{ cat.name }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assignments List -->
+  <div *ngIf="isLoadingAssignments" class="text-center my-4">
+    <p class="text-muted">Aufgaben werden geladen...</p>
+  </div>
+
+  <div *ngIf="!isLoadingAssignments && !filterStudentId" class="empty-state">
+    <h3>Kein Student ausgewählt</h3>
+    <p>Bitte wähle einen Student aus dem Filter oben, um dessen Aufgaben anzuzeigen.</p>
+  </div>
+
+  <div *ngIf="!isLoadingAssignments && filterStudentId" class="assignments-grid">
+    <div 
+      *ngFor="let assignment of filteredAssignments"
+      class="assignment-card card"
+      (click)="selectAssignment(assignment)">
+      
+      <div class="assignment-header">
+        <h3 class="assignment-title">{{ assignment.title }}</h3>
+        <button class="btn-delete" (click)="deleteAssignment(assignment, $event)">×</button>
+      </div>
+      
+      <p class="assignment-description">{{ assignment.description }}</p>
+      
+      <div class="assignment-meta">
+        <div class="meta-badges">
+          <span class="badge badge-secondary">{{ getCategoryName(assignment.categoryId) }}</span>
+          <span class="badge" [ngClass]="getStatusBadgeClass(assignment.status)">
+            {{ getStatusLabel(assignment.status) }}
+          </span>
+        </div>
+        <div class="meta-info">
+          <span class="date">{{ assignment.createdDate | date:'dd.MM.yyyy' }}</span>
+          <span class="score" *ngIf="getLatestScore(assignment) !== null">
+            <span class="badge" [ngClass]="getScoreBadgeClass(getLatestScore(assignment))">
+              {{ getLatestScore(assignment) }}%
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="filteredAssignments.length === 0 && filterStudentId">
+      <h3>Keine Lernaufgaben gefunden</h3>
+      <p>Versuche die Filter anzupassen oder erstelle eine neue Aufgabe im Bot-Chat.</p>
+    </div>
+  </div>
+
+  <!-- Assignment Detail Modal -->
+  <div class="modal-overlay" *ngIf="selectedAssignment" (click)="closeDetails()">
+    <div class="modal-content card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ selectedAssignment.title }}</h2>
+        <button class="btn-close" (click)="closeDetails()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="detail-section" *ngIf="selectedAssignment.studentPrompt">
+          <h4>Dein Lernwunsch</h4>
+          <p>{{ selectedAssignment.studentPrompt }}</p>
+        </div>
+
+        <div class="detail-section">
+          <h4>Beschreibung</h4>
+          <p>{{ selectedAssignment.description }}</p>
+        </div>
+        
+        <div class="detail-section">
+          <h4>Metadaten</h4>
+          <div class="detail-grid">
+            <div>
+              <strong>Thema:</strong>
+              <span class="badge badge-secondary">{{ getCategoryName(selectedAssignment.categoryId) }}</span>
+            </div>
+            <div>
+              <strong>Erstellt:</strong>
+              {{ selectedAssignment.createdDate | date:'dd.MM.yyyy HH:mm' }}
+            </div>
+            <div *ngIf="getLatestSubmissionDate(selectedAssignment)">
+              <strong>Eingereicht:</strong>
+              {{ getLatestSubmissionDate(selectedAssignment) | date:'dd.MM.yyyy HH:mm' }}
+            </div>
+          </div>
+        </div>
+        
+        <div class="detail-section" *ngIf="getLatestAnswer(selectedAssignment)">
+          <h4>Letzte Antwort</h4>
+          <pre class="code-block">{{ getLatestAnswer(selectedAssignment) }}</pre>
+        </div>
+        
+        <div class="detail-section" *ngIf="getLatestScore(selectedAssignment) as latestScore">
+          <h4>Bewertung</h4>
+          <div class="score-display">
+            <span class="score-large" [ngClass]="{
+              'text-success': latestScore >= 80,
+              'text-warning': latestScore >= 50 && latestScore < 80,
+              'text-danger': latestScore < 50
+            }">
+              {{ latestScore }}%
+            </span>
+          </div>
+        </div>
+        
+        <div class="detail-section" *ngIf="getLatestFeedback(selectedAssignment)">
+          <h4>Feedback</h4>
+          <p class="feedback-text">{{ getLatestFeedback(selectedAssignment) }}</p>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetails()">Schließen</button>
+        <button class="btn btn-danger" (click)="deleteAssignment(selectedAssignment, $event)">Löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+

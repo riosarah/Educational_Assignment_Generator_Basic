@@ -1,0 +1,8 @@
+﻿{
+  "profiles": {
+    "programming_trainer.CodeGenApp": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    }
+  }
+}

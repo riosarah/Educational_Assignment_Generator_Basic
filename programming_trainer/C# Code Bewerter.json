@@ -1,0 +1,239 @@
+{
+  "name": "C# Code Bewerter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "evaluate-task",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6b30d306-9e1c-4b3f-b482-e46b9a01c7aa",
+      "name": "Webhook - Task Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        -64
+      ],
+      "webhookId": "1efb8912-4389-405f-b7c1-b7479d645bc0"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Input-Validierung und Vorbereitung\nconst body = $input.item.json.body;\n\nif (!body.topic || !body.studentId) {\n  throw new Error('Fehlende Parameter: topic und studentId erforderlich');\n}\n\nconst topic = body.topic;\nconst difficulty = body.difficulty || 'mittel';\nconst studentId = body.studentId;\nconst includeTestCases = body.includeTestCases !== false;\n\n// Prompt für AI vorbereiten\nconst systemPrompt = `Du bist ein erfahrener C# Dozent und Softwareentwickler. \nDeine Aufgabe ist es, präzise und lehrreiche Programmieraufgaben für Studenten zu erstellen.\nDie Aufgaben sollen praxisnah sein und Best Practices vermitteln.`;\n\nconst userPrompt = `Erstelle eine C# Programmieraufgabe zum Thema: \"${topic}\"\n\nSchwierigkeitsgrad: ${difficulty}\n\nDie Aufgabe soll folgende Struktur haben:\n1. Titel (kurz und prägnant)\n2. Beschreibung (Was soll programmiert werden?)\n3. Anforderungen (Liste mit mindestens 5 konkreten Anforderungen)\n4. ${includeTestCases ? 'Testfälle (mindestens 3 Beispiel-Inputs mit erwarteten Outputs)' : ''}\n5. Hinweise (optionale Tipps für die Umsetzung)\n6. Lernziele (Was lernt der Student?)\n\nFormat: JSON mit dieser Struktur:\n{\n  \"title\": \"...\",\n  \"description\": \"...\",\n  \"requirements\": [\"...\"],\n  \"testCases\": [{\"input\": \"...\", \"expectedOutput\": \"...\"}],\n  \"hints\": [\"...\"],\n  \"learningGoals\": [\"...\"]\n}`;\n\nreturn {\n  json: {\n    studentId,\n    topic,\n    difficulty,\n    systemPrompt,\n    userPrompt,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "80c6aa0c-ed23-4158-a370-cb04907d8637",
+      "name": "Request Validierung",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "11bdcf32-1da1-4989-a68f-bd2b2d47be5d",
+      "name": "OpenAI - Aufgabe generieren",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -64
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "iMe6LlMtPdK2T4G0",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// AI Response verarbeiten und strukturieren\nconst aiResponse = $input.item.json.choices[0].message.content;\nconst taskData = JSON.parse(aiResponse);\nconst studentId = $('Request Validierung').item.json.studentId;\nconst topic = $('Request Validierung').item.json.topic;\nconst difficulty = $('Request Validierung').item.json.difficulty;\n\n// Vollständige Aufgaben-Struktur\nconst task = {\n  id: `task-${Date.now()}`,\n  studentId: studentId,\n  topic: topic,\n  difficulty: difficulty,\n  title: taskData.title,\n  description: taskData.description,\n  requirements: taskData.requirements,\n  testCases: taskData.testCases || [],\n  hints: taskData.hints || [],\n  learningGoals: taskData.learningGoals || [],\n  createdAt: new Date().toISOString(),\n  status: 'open'\n};\n\nreturn {\n  json: task\n};"
+      },
+      "id": "ab925050-a6e1-4fb7-8065-9a353b9addd4",
+      "name": "Response Formatierung",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5000/api/tasks",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=",
+              "value": "={{ $json }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "cb10a787-a6cc-4223-b278-1ec7cdb8a7f3",
+      "name": "In Backend speichern",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        112,
+        -64
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "215357ca-e8c4-431a-a264-ba7eb22762e5",
+      "name": "Response senden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Error Handling\nconst error = $input.item.json.error;\n\nreturn {\n  json: {\n    success: false,\n    error: error?.message || 'Unbekannter Fehler',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "d0ed950d-d479-494f-85af-8a58a70ba8d3",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        528,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "1e1568e1-fef5-422d-8a7b-e235ad2efaac",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        704,
+        32
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Task Request": {
+      "main": [
+        [
+          {
+            "node": "Request Validierung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Validierung": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Aufgabe generieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Aufgabe generieren": {
+      "main": [
+        [
+          {
+            "node": "Response Formatierung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Formatierung": {
+      "main": [
+        [
+          {
+            "node": "In Backend speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In Backend speichern": {
+      "main": [
+        [
+          {
+            "node": "Response senden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "918fc643-dd21-40e4-a775-e768ee8b9dc2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "92c9315242e78b4ff1b6d73d40cb26ee343c7a5564c1b7e43d894967ebb556a2"
+  },
+  "id": "c4JEemztUHh6K3ox",
+  "tags": []
+}

@@ -1,0 +1,9 @@
+Name;FileExtension;IsActive
+C#;.cs;true
+Java;.java;true
+Python;.py;true
+JavaScript;.js;true
+TypeScript;.ts;true
+C++;.cpp;true
+Go;.go;true
+Rust;.rs;true

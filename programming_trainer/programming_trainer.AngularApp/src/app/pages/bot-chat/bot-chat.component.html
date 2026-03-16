@@ -1,0 +1,216 @@
+<div class="assignment-builder-container">
+  <div class="page-header">
+    <h2>Aufgabe erstellen</h2>
+    <p class="subtitle">Definiere Themenbereich, Thema, Schwierigkeit und Sprache. Die Aufgabe wird als Markdown ausgegeben.</p>
+  </div>
+
+  <div class="card form-card">
+    <div class="card-header">Student</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Student auswaehlen</label>
+        <div *ngIf="isLoadingStudents" class="text-muted">Studenten werden geladen...</div>
+        <div *ngIf="!isLoadingStudents" class="input-group">
+          <select class="form-control" [(ngModel)]="selectedStudentId">
+            <option [ngValue]="null">-- Student waehlen --</option>
+            <option *ngFor="let student of students" [ngValue]="student.id">
+              {{ student.firstName }} {{ student.lastName }} ({{ student.email }})
+            </option>
+          </select>
+          <button class="btn btn-outline-secondary" (click)="openCreateStudentModal()" title="Neuen Student erstellen">
+            +
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card form-card">
+    <div class="card-header">Schritt 1: Themenwahl</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Themenbereich</label>
+        <select class="form-control" [(ngModel)]="selectedTopicAreaId" (change)="onTopicAreaChange()">
+          <option [ngValue]="null">-- Themenbereich waehlen --</option>
+          <option *ngFor="let area of topicAreas" [ngValue]="area.id">
+            {{ area.name }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Thema</label>
+        <select class="form-control" [(ngModel)]="selectedTopic" [disabled]="!selectedTopicAreaId">
+          <option [value]="null">-- Thema waehlen --</option>
+          <option *ngFor="let topic of availableTopics" [value]="topic">
+            {{ topic }}
+          </option>
+          <option [value]="'__custom__'">Anderes Thema...</option>
+        </select>
+        <input
+          *ngIf="isCustomTopicSelected"
+          type="text"
+          class="form-control mt-2"
+          [(ngModel)]="customTopic"
+          placeholder="Eigenes Thema eingeben" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card form-card">
+    <div class="card-header">Schritt 2: Rahmen</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Schwierigkeit</label>
+        <select class="form-control" [(ngModel)]="selectedDifficulty">
+          <option [value]="null">-- Schwierigkeit waehlen --</option>
+          <option *ngFor="let option of difficultyOptions" [value]="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Sprache</label>
+        <select class="form-control" [(ngModel)]="selectedLanguage">
+          <option [value]="null">-- Sprache waehlen --</option>
+          <option *ngFor="let option of languageOptions" [value]="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Ausgabeformat</label>
+        <input class="form-control" [value]="'Markdown'" disabled />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Zusaetzliche Anforderungen</label>
+      <textarea
+        class="form-control"
+        rows="4"
+        [(ngModel)]="additionalRequirements"
+        placeholder="Optional: Spezielle Hinweise oder Schwerpunkte..."></textarea>
+      <span class="hint">Leer lassen, um einen Standardtext aus den Eingaben zu verwenden.</span>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" (click)="generateAssignment()" [disabled]="!selectedStudentId || !canGenerate || isGenerating">
+        {{ isGenerating ? 'Generiere...' : 'Aufgabe generieren' }}
+      </button>
+      <span class="hint" *ngIf="!selectedStudentId">Bitte einen Student auswaehlen.</span>
+      <span class="hint" *ngIf="selectedStudentId && !canGenerate">Bitte alle Felder ausfuellen.</span>
+      <span class="hint text-warning" *ngIf="assignmentMessage">{{ assignmentMessage }}</span>
+    </div>
+  </div>
+
+  <div class="card output-card" *ngIf="assignmentMarkdown">
+    <div class="output-header">
+      <div>
+        <h3>{{ assignmentTitle }}</h3>
+        <div class="output-meta">
+          <span class="badge badge-secondary">Markdown</span>
+          <span class="timestamp" *ngIf="generatedAt">{{ generatedAt | date:'dd.MM.yyyy HH:mm' }}</span>
+        </div>
+      </div>
+      <div class="output-actions">
+        <button class="btn btn-outline-primary" (click)="downloadPdf()">PDF herunterladen</button>
+      </div>
+    </div>
+
+    <div class="preview-grid">
+      <div class="preview-panel">
+        <h4>Markdown</h4>
+        <pre class="markdown-output">{{ assignmentMarkdown }}</pre>
+      </div>
+
+      <div class="preview-panel">
+        <h4>Vorschau</h4>
+        <div id="assignment-preview" #assignmentPreview [innerHTML]="assignmentHtml"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card evaluation-card" *ngIf="assignmentMarkdown">
+    <div class="card-header">Antwort abgeben</div>
+    <div class="form-group">
+      <label class="form-label">Deine Antwort</label>
+      <textarea
+        class="form-control"
+        rows="8"
+        [(ngModel)]="answerText"
+        placeholder="Fasse deine Antwort hier zusammen..."></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn btn-success" (click)="submitAnswerForEvaluation()" [disabled]="isEvaluating || !answerText.trim()">
+        {{ isEvaluating ? 'Sende...' : 'Bewertung anfragen' }}
+      </button>
+      <span class="hint text-warning" *ngIf="!assignmentId">Die Bewertung ist erst nach der Generierung verfuegbar.</span>
+    </div>
+
+    <div class="evaluation-result" *ngIf="evaluationScore !== null || evaluationFeedback || evaluationMessage">
+      <div class="score-display" *ngIf="evaluationScore !== null">
+        <span class="score-label">Score:</span>
+        <span class="score-value" [class.high-score]="evaluationScore >= 80"
+                                   [class.medium-score]="evaluationScore >= 50 && evaluationScore < 80"
+                                   [class.low-score]="evaluationScore < 50">
+          {{ evaluationScore }}%
+        </span>
+      </div>
+      <div class="feedback" *ngIf="evaluationFeedback">
+        <strong>Feedback:</strong>
+        <div class="feedback-markdown" [innerHTML]="evaluationFeedbackHtml"></div>
+      </div>
+      <p class="hint" *ngIf="evaluationMessage">{{ evaluationMessage }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- Create Student Modal -->
+<div class="modal-overlay" *ngIf="showCreateStudentModal" (click)="closeCreateStudentModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Neuen Student erstellen</h5>
+        <button type="button" class="btn-close" (click)="closeCreateStudentModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group mb-3">
+          <label class="form-label">Vorname</label>
+          <input type="text" class="form-control" [(ngModel)]="newStudent.firstName" 
+                 placeholder="z.B. Max" />
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Nachname</label>
+          <input type="text" class="form-control" [(ngModel)]="newStudent.lastName" 
+                 placeholder="z.B. Mueller" />
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">E-Mail</label>
+          <input type="email" class="form-control" [(ngModel)]="newStudent.email" 
+                 placeholder="z.B. max.mueller@example.com" />
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">Matrikelnummer</label>
+          <input type="text" class="form-control" [(ngModel)]="newStudent.studentNumber" 
+                 placeholder="z.B. M123456" />
+        </div>
+        <div *ngIf="createStudentMessage" class="alert alert-warning">
+          {{ createStudentMessage }}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeCreateStudentModal()">
+          Abbrechen
+        </button>
+        <button type="button" class="btn btn-primary" (click)="createNewStudent()" 
+                [disabled]="isCreatingStudent">
+          {{ isCreatingStudent ? 'Wird erstellt...' : 'Student erstellen' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+

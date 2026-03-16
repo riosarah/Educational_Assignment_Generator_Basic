@@ -1,0 +1,84 @@
+﻿<nav class="navbar">
+  <div class="container-fluid">
+    <a class="navbar-brand" routerLink="/bot-chat">
+      <i class="bi bi-robot"></i>
+      Lerntrainer
+    </a>
+
+    <!-- Hamburger Button -->
+    <button class="navbar-toggler" type="button" (click)="isMenuCollapsed = !isMenuCollapsed">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navigation Menu -->
+    <div class="navbar-menu" [ngClass]="{'show': !isMenuCollapsed}">
+      <ul class="nav-list">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/bot-chat" routerLinkActive="active" (click)="isMenuCollapsed = true">
+            <i class="bi bi-robot"></i>
+            Aufgabe erstellen
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/portfolio" routerLinkActive="active" (click)="isMenuCollapsed = true">
+            <i class="bi bi-folder"></i>
+            Portfolio
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/dashboard" routerLinkActive="active" (click)="isMenuCollapsed = true">
+            <i class="bi bi-speedometer2"></i>
+            Dashboard
+          </a>
+        </li>
+      </ul>
+
+      <!-- Right-aligned items -->
+      <ul class="nav-list nav-list-right">
+        <!-- Theme Toggle -->
+        <li class="nav-item">
+          <a class="nav-link" role="button" (click)="toggleTheme()" [title]="'THEME.' + (currentTheme === 'light' ? 'SWITCH_TO_DARK' : 'SWITCH_TO_LIGHT') | translate">
+            <i class="bi" [ngClass]="currentTheme === 'light' ? 'bi-moon-stars' : 'bi-sun'"></i>
+          </a>
+        </li>
+
+        <!-- Language Selector -->
+        <li ngbDropdown class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" role="button" ngbDropdownToggle>
+            <i class="bi bi-globe"></i>
+            {{ currentLanguage === 'de' ? 'DE' : 'EN' }}
+          </a>
+          <div ngbDropdownMenu class="dropdown-menu">
+            <button class="dropdown-item" type="button" ngbDropdownItem (click)="switchLanguage('de')">
+              Deutsch
+            </button>
+            <button class="dropdown-item" type="button" ngbDropdownItem (click)="switchLanguage('en')">
+              English
+            </button>
+          </div>
+        </li>
+
+        <!-- User Menu -->
+        <ng-container *ngIf="isLoginRequired">
+          <li ngbDropdown class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" role="button" ngbDropdownToggle>
+              <i class="bi bi-person"></i>
+              {{ userName }}
+            </a>
+            <div *ngIf="isLoggedIn" ngbDropdownMenu class="dropdown-menu">
+              <button class="dropdown-item" type="button" ngbDropdownItem (click)="logout()">
+                <i class="bi bi-box-arrow-right me-2"></i>
+                {{ 'AUTH.LOGOUT' | translate }}
+              </button>
+            </div>
+          </li>
+        </ng-container>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="main-content">
+  <router-outlet></router-outlet>
+</div>
+
